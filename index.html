@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A transparent local-inference fit configurator for Qwen3.8-Flash-Next.">
+  <meta name="color-scheme" content="dark light">
+  <title>Flashfit — Qwen3.8-Flash-Next configurator</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <a class="skip-link" href="#configurator">Skip to configurator</a>
+
+  <header class="site-header">
+    <a class="wordmark" href="#top" aria-label="Flashfit home">
+      <span class="wordmark-mark" aria-hidden="true">F</span>
+      <span>Flashfit</span>
+    </a>
+    <div class="header-meta">
+      <span class="verification">Data verified <time datetime="2026-09-02">02 Sep 2026</time></span>
+      <button class="icon-button" id="theme-toggle" type="button" aria-label="Switch to light theme" title="Switch theme">
+        <span class="theme-icon" aria-hidden="true">◐</span>
+        <span class="theme-label">Light</span>
+      </button>
+    </div>
+  </header>
+
+  <main id="top">
+    <section class="intro shell" aria-labelledby="page-title">
+      <div class="intro-copy">
+        <p class="eyebrow">Local inference field guide · Qwen3.8-Flash-Next</p>
+        <h1 id="page-title">Will it <em>fit?</em></h1>
+        <p class="lede">A memory-first reality check for a model whose <strong>6B active parameters</strong> do not tell the whole residency story.</p>
+        <div class="principle-note">
+          <span class="evidence evidence--calculated">No speed guessing</span>
+          <p>Flashfit sizes known payloads, applies disclosed operating headroom, and keeps community measurements separate.</p>
+        </div>
+      </div>
+
+      <div class="anatomy" aria-label="Qwen3.8-Flash-Next model anatomy">
+        <div class="anatomy-grid">
+          <div class="anatomy-stat anatomy-stat--main">
+            <span class="anatomy-number">125B</span>
+            <span class="anatomy-label">Main model</span>
+          </div>
+          <span class="anatomy-symbol" aria-hidden="true">+</span>
+          <div class="anatomy-stat">
+            <span class="anatomy-number">51B</span>
+            <span class="anatomy-label">N-gram embeddings</span>
+          </div>
+          <span class="anatomy-symbol anatomy-arrow" aria-hidden="true">→</span>
+          <div class="anatomy-stat anatomy-stat--active">
+            <span class="anatomy-number">6B</span>
+            <span class="anatomy-label">Active / token</span>
+          </div>
+        </div>
+        <p>Active parameters describe compute per token—not the model data that must exist somewhere in memory or storage. Qwen notes that the N-gram table can be offloaded to host memory.</p>
+      </div>
+    </section>
+
+    <section class="workspace shell" id="configurator" aria-label="Flashfit configurator">
+      <form class="config-panel" id="config-form" novalidate>
+        <div class="panel-heading">
+          <div>
+            <p class="step-label">01 · Configure</p>
+            <h2>Your machine</h2>
+          </div>
+          <span class="example-badge" id="example-badge">Example configuration</span>
+        </div>
+
+        <fieldset class="control-group">
+          <legend>Memory architecture</legend>
+          <div class="segmented segmented--three" id="architecture-options">
+            <label><input type="radio" name="architecture" value="discrete"><span>Discrete GPU</span></label>
+            <label><input type="radio" name="architecture" value="unified" checked><span>Unified memory</span></label>
+            <label><input type="radio" name="architecture" value="cpu"><span>CPU / RAM</span></label>
+          </div>
+        </fieldset>
+
+        <div class="field-grid architecture-fields" data-architecture="unified">
+          <label class="field">
+            <span>Total unified memory <small>GB</small></span>
+            <input id="unified-memory" name="unifiedMemory" type="number" min="1" max="4096" step="1" value="128" inputmode="decimal">
+          </label>
+          <label class="field">
+            <span>Reserved for OS / apps <small>GB</small></span>
+            <input id="unified-reserve" name="unifiedReserve" type="number" min="0" max="2048" step="1" value="16" inputmode="decimal">
+          </label>
+        </div>
+
+        <div class="field-grid architecture-fields" data-architecture="discrete" hidden>
+          <label class="field">
+            <span>GPU VRAM <small>GB</small></span>
+            <input id="gpu-vram" name="gpuVram" type="number" min="0" max="4096" step="1" value="24" inputmode="decimal">
+          </label>
+          <label class="field">
+            <span>System RAM <small>GB</small></span>
+            <input id="system-ram" name="systemRam" type="number" min="1" max="4096" step="1" value="128" inputmode="decimal">
+          </label>
+          <label class="field">
+            <span>OS / app reserve <small>GB</small></span>
+            <input id="system-reserve" name="systemReserve" type="number" min="0" max="2048" step="1" value="16" inputmode="decimal">
+          </label>
+          <label class="field">
+            <span>VRAM reserve <small>GB</small></span>
+            <input id="vram-reserve" name="vramReserve" type="number" min="0" max="2048" step="0.5" value="2" inputmode="decimal">
+          </label>
+        </div>
+
+        <div class="field-grid architecture-fields" data-architecture="cpu" hidden>
+          <label class="field">
+            <span>Total system RAM <small>GB</small></span>
+            <input id="cpu-ram" name="cpuRam" type="number" min="1" max="4096" step="1" value="128" inputmode="decimal">
+          </label>
+          <label class="field">
+            <span>Reserved for OS / apps <small>GB</small></span>
+            <input id="cpu-reserve" name="cpuReserve" type="number" min="0" max="2048" step="1" value="16" inputmode="decimal">
+          </label>
+        </div>
+
+        <div class="inline-warning" id="validation-message" role="status" hidden></div>
+
+        <div class="field-grid field-grid--selectors">
+          <label class="field">
+            <span>Backend</span>
+            <select id="backend" name="backend">
+              <option value="cuda">llama.cpp / CUDA</option>
+              <option value="rocm" selected>llama.cpp / ROCm</option>
+              <option value="metal">llama.cpp / Metal</option>
+              <option value="cpu">llama.cpp / CPU</option>
+              <option value="custom">Other / custom</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Hardware family <small>reference matching only</small></span>
+            <select id="hardware-family" name="hardwareFamily">
+              <option value="strix" selected>AMD Strix Halo</option>
+              <option value="apple">Apple Silicon</option>
+              <option value="gb10">NVIDIA GB10 / DGX Spark</option>
+              <option value="nvidia">NVIDIA discrete GPU</option>
+              <option value="amd">AMD discrete GPU</option>
+              <option value="general">General / other</option>
+            </select>
+          </label>
+        </div>
+
+        <fieldset class="control-group quant-group">
+          <legend>Quantization</legend>
+          <button class="quant-selector" id="quant-selector" type="button" aria-expanded="false" aria-controls="quant-menu">
+            <span>
+              <strong id="selected-quant-name">UD-IQ4_XS</strong>
+              <small id="selected-quant-note">Practical local-inference range</small>
+            </span>
+            <span class="quant-size" id="selected-quant-size">93.7 GB</span>
+            <span class="chevron" aria-hidden="true">⌄</span>
+          </button>
+          <div class="quant-menu" id="quant-menu" role="listbox" aria-label="Quantization options" tabindex="-1" hidden></div>
+        </fieldset>
+
+        <fieldset class="control-group">
+          <legend>Context length</legend>
+          <div class="context-presets" id="context-presets">
+            <button type="button" data-context="8192">8K</button>
+            <button type="button" data-context="16384">16K</button>
+            <button class="is-active" type="button" data-context="32768">32K</button>
+            <button type="button" data-context="65536">64K</button>
+            <button type="button" data-context="131072">128K</button>
+            <button type="button" data-context="262144">262K</button>
+            <button type="button" data-context="custom">Custom</button>
+          </div>
+          <label class="field custom-context" id="custom-context-wrap" hidden>
+            <span>Custom context <small>tokens</small></span>
+            <input id="custom-context" name="customContext" type="number" min="1024" max="2000000" step="1024" value="32768" inputmode="numeric">
+          </label>
+          <div class="extended-warning" id="extended-warning" hidden>
+            <strong>Extended / experimental</strong>
+            <span>Above 262,144 tokens. Verify backend support and real memory behavior; native support does not guarantee a comfortable local run.</span>
+          </div>
+        </fieldset>
+
+        <details class="advanced" id="advanced-section">
+          <summary>
+            <span><span class="step-label">Advanced</span> Optional components</span>
+            <span class="summary-icon" aria-hidden="true">+</span>
+          </summary>
+          <div class="advanced-body">
+            <label class="switch-row">
+              <span><strong>Vision enabled</strong><small>Adds the F16 vision projector (~0.9 GB).</small></span>
+              <input id="vision-enabled" name="vision" type="checkbox" role="switch">
+              <span class="switch" aria-hidden="true"></span>
+            </label>
+            <label class="switch-row">
+              <span><strong>Experimental MTP</strong><small>Adds the current Q8 MTP head (~2.79 GB). Backend/version dependent.</small></span>
+              <input id="mtp-enabled" name="mtp" type="checkbox" role="switch">
+              <span class="switch" aria-hidden="true"></span>
+            </label>
+            <p class="advanced-note">MTP proposes multiple future tokens and accepts those that agree with the main model. It can raise decode throughput on suitable workloads, but support and gains are not universal.</p>
+          </div>
+        </details>
+
+        <button class="text-button reset-button" id="reset-button" type="button">Reset to example</button>
+      </form>
+
+      <section class="result-panel" aria-labelledby="result-heading" aria-live="polite">
+        <div class="result-topline">
+          <p class="step-label">02 · Diagnose</p>
+          <div class="evidence-key" aria-label="Evidence labels">
+            <span class="evidence evidence--measured">Measured</span>
+            <span class="evidence evidence--calculated">Calculated</span>
+            <span class="evidence evidence--heuristic">Heuristic</span>
+          </div>
+        </div>
+
+        <div class="verdict" id="verdict" data-tone="good">
+          <div>
+            <p class="verdict-kicker" id="verdict-kicker">Unified memory</p>
+            <h2 id="result-heading">Comfortable fit</h2>
+          </div>
+          <div class="verdict-seal" aria-hidden="true"><span id="verdict-code">01</span></div>
+        </div>
+
+        <p class="recommendation" id="recommendation">This configuration leaves useful operating headroom for the selected context.</p>
+
+        <dl class="result-metrics">
+          <div><dt>Model payload <span class="evidence evidence--measured">Distribution</span></dt><dd id="payload-value">93.7 GB</dd></div>
+          <div><dt>Available memory <span class="evidence evidence--calculated">Calculated</span></dt><dd id="available-value">112.0 GB</dd></div>
+          <div><dt>Operating target <span class="evidence evidence--heuristic">Heuristic</span></dt><dd id="recommended-value">103.1 GB</dd></div>
+          <div><dt>Headroom / deficit</dt><dd id="difference-value">+8.9 GB</dd></div>
+        </dl>
+
+        <div class="memory-figure">
+          <div class="memory-caption">
+            <div>
+              <p>Memory budget</p>
+              <span id="memory-subtitle">112 GB usable unified memory</span>
+            </div>
+            <span class="memory-scale" id="memory-scale">0 — 112 GB</span>
+          </div>
+          <div class="memory-ruler" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+          <div class="memory-track" id="memory-track" role="img" aria-label="Memory allocation visualization">
+            <div class="memory-available" id="memory-available"></div>
+            <div class="memory-payload" id="memory-payload"></div>
+            <div class="memory-vision" id="memory-vision"></div>
+            <div class="memory-mtp" id="memory-mtp"></div>
+            <div class="memory-operating" id="memory-operating"></div>
+            <div class="memory-limit" id="memory-limit"><span>available</span></div>
+          </div>
+          <div class="memory-legend">
+            <span><i class="legend-model"></i>Model</span>
+            <span id="vision-legend" hidden><i class="legend-vision"></i>Vision</span>
+            <span id="mtp-legend" hidden><i class="legend-mtp"></i>MTP</span>
+            <span><i class="legend-headroom"></i>Operating headroom</span>
+            <span id="offload-legend" hidden><i class="legend-offload"></i>Host offload pool</span>
+          </div>
+        </div>
+
+        <div class="selection-summary">
+          <div><span>Quant</span><strong id="result-quant">UD-IQ4_XS</strong></div>
+          <div><span>Context</span><strong id="result-context">32K</strong></div>
+          <div><span>Backend</span><strong id="result-backend">ROCm</strong></div>
+          <div><span>Residency</span><strong id="result-residency">Unified pool</strong></div>
+        </div>
+
+        <div class="result-actions">
+          <button class="primary-button" id="copy-button" type="button"><span aria-hidden="true">⌁</span> Copy configuration</button>
+          <button class="secondary-button" id="export-button" type="button"><span aria-hidden="true">↗</span> Export result card</button>
+        </div>
+        <p class="action-status" id="action-status" role="status" aria-live="polite"></p>
+      </section>
+    </section>
+
+    <section class="references shell" aria-labelledby="references-title">
+      <div class="section-heading">
+        <div>
+          <p class="step-label">03 · Compare carefully</p>
+          <h2 id="references-title">Measured in the wild</h2>
+        </div>
+        <p>Actual configurations, not predictions for your machine.</p>
+      </div>
+
+      <article class="closest-reference" id="closest-reference">
+        <div class="closest-label"><span class="pulse-dot" aria-hidden="true"></span> Closest measured reference</div>
+        <div id="closest-reference-content"></div>
+      </article>
+
+      <div class="benchmark-grid" id="benchmark-grid"></div>
+      <p class="reference-caveat">Numbers are workload- and build-specific. Prompt processing (PP) and token generation (TG) measure different phases; speculative results depend strongly on draft acceptance.</p>
+    </section>
+
+    <section class="methodology shell" id="methodology" aria-labelledby="methodology-title">
+      <div class="methodology-copy">
+        <p class="step-label">Methodology</p>
+        <h2 id="methodology-title">The honest version of “fits.”</h2>
+        <p>Flashfit does not claim an exact KV-cache calculation for this architecture. It compares the current distribution payload with usable memory, then adds a disclosed operating cushion so “barely loads” is not confused with “comfortable.”</p>
+      </div>
+      <ol class="formula-list">
+        <li><span>Known payload</span><strong>GGUF + optional vision + optional MTP</strong><small>Measured distribution sizes</small></li>
+        <li><span>Effective memory</span><strong>Installed memory − reserves</strong><small>Transparent calculation</small></li>
+        <li><span>Operating target</span><strong>Payload × context multiplier</strong><small>10% ≤32K · 12% ≤64K · 15% ≤128K · 20% ≤262K · 30% beyond</small></li>
+        <li><span>Fit verdict</span><strong>Available vs payload and target</strong><small>Heuristic recommendation—not a guarantee</small></li>
+      </ol>
+    </section>
+
+    <section class="sources shell" aria-labelledby="sources-title">
+      <div>
+        <p class="step-label">Sources & methodology</p>
+        <h2 id="sources-title">Primary trail</h2>
+      </div>
+      <ul>
+        <li><a href="https://github.com/QwenLM/Qwen3.8-Flash-Next" target="_blank" rel="noreferrer">Official Qwen repository</a><span>Architecture, parameter counts, llama.cpp support and 262K deployment examples.</span></li>
+        <li><a href="https://huggingface.co/unsloth/Qwen3.8-Flash-Next-GGUF" target="_blank" rel="noreferrer">Unsloth GGUF distribution</a><span>Current quant, projector and MTP payload sizes.</span></li>
+        <li><a href="https://github.com/ggml-org/llama.cpp/discussions/27950" target="_blank" rel="noreferrer">llama.cpp discussion #27950</a><span>Reproducible Strix Halo / ROCm measurements and patch stack.</span></li>
+        <li><a href="https://huggingface.co/unsloth/Qwen3.8-Flash-Next-GGUF/discussions/3" target="_blank" rel="noreferrer">Community speed ledger</a><span>M1 Ultra custom-branch and other fully described llama.cpp results.</span></li>
+        <li><a href="https://forums.developer.nvidia.com/t/qwen3-8-flash-next-nvfp4-single-spark/381500" target="_blank" rel="noreferrer">NVIDIA developer forum field report</a><span>GB10 custom SGLang NVFP4/MTP reference.</span></li>
+      </ul>
+      <p class="verified-note">Last verified 02 September 2026. Payload sizes can change when distributions are re-exported. Re-check linked sources before a costly hardware decision.</p>
+    </section>
+  </main>
+
+  <footer class="site-footer shell">
+    <span>Flashfit</span>
+    <p>Local calculations. No hardware data leaves this browser.</p>
+    <span>Rosarium &amp; Florentine</span>
+  </footer>
+
+  <canvas id="export-canvas" width="1200" height="675" hidden></canvas>
+  <script src="script.js"></script>
+</body>
+</html>
